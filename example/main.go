@@ -21,8 +21,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := json.Parse(string(b)); err != nil {
+	if v, err := json.Parse(string(b)); err != nil {
 		panic(err)
+	} else {
+		if vv, ok := v.(json.Value); ok {
+			fmt.Println(vv)
+		}
 	}
 
 }

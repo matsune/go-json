@@ -2,14 +2,6 @@ package json
 
 import _stack "github.com/golang-collections/collections/stack"
 
-type nestType int
-
-const (
-	_ nestType = iota
-	nestObj
-	nestArr
-)
-
 type nestStack struct {
 	inner *_stack.Stack
 }
@@ -20,24 +12,45 @@ func newStack() *nestStack {
 	}
 }
 
-func (s *nestStack) push(n nestType) {
-	s.inner.Push(n)
+func (s *nestStack) pushArray() *ArrayValue {
+	arr := newArray()
+	s.inner.Push(arr)
+	return arr
 }
 
-func (s *nestStack) pop() nestType {
-	p := s.inner.Pop()
-	if p != nil {
-		return p.(nestType)
-	}
-	return 0
+func (s *nestStack) pushObject() *ObjectValue {
+	obj := newObject()
+	s.inner.Push(obj)
+	return obj
 }
 
-func (s *nestStack) peek() nestType {
-	p := s.inner.Peek()
-	if p != nil {
-		return p.(nestType)
+func (s *nestStack) pop() nestValue {
+	return s.inner.Pop().(nestValue)
+}
+
+func (s *nestStack) peek() nestValue {
+	if v, ok := s.inner.Peek().(nestValue); ok {
+		return v
 	}
-	return 0
+	return nil
+}
+
+func (s *nestStack) isObj() bool {
+	switch s.peek().(type) {
+	case *ObjectValue:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *nestStack) isArr() bool {
+	switch s.peek().(type) {
+	case *ArrayValue:
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *nestStack) len() int {

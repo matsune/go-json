@@ -2,7 +2,6 @@ package json
 
 import (
 	"errors"
-	"fmt"
 )
 
 type state int
@@ -13,7 +12,7 @@ const (
 	stateKey
 )
 
-func Parse(str string) error {
+func Parse(str string) (Value, error) {
 	p := newParser(str)
 
 	var c rune
@@ -22,112 +21,128 @@ func Parse(str string) error {
 	// check first char array or object
 	if c, err = p.skipSpaces(); err != nil {
 		// empty
-		return errors.New("empty contents")
+		return nil, errors.New("empty contents")
 	}
 	if c != '{' && c != '[' {
-		return newError(p.pos, "expected { or [")
+		return nil, newError(p.pos, "expected { or [")
 	}
 
+	var value Value
 	st := stateValue
 
 loop:
 	for {
 		if c, err = p.skipSpaces(); err != nil {
-			return err
+			return nil, err
 		}
 		switch st {
 		case stateKey:
 			keyStr, err := p.parseString()
 			if err != nil {
-				return err
+				return nil, err
 			}
-			fmt.Printf("%q", keyStr)
 			if c, err = p.skipSpaces(); err != nil {
-				return err
+				return nil, err
 			}
 			if err := p.must(':'); err != nil {
-				return err
+				return nil, err
 			}
-			fmt.Print(":")
+			p.nestStack.peek().(*ObjectValue).AddKey(keyStr)
 			st = stateValue
 		case stateValue:
 			switch c {
 			case '{': // object start
 				p.consume()
-				p.push(nestObj)
+				last := p.nestStack.peek()
+				if last != nil {
+					last.addValue(p.pushObject())
+				} else {
+					p.pushObject()
+				}
+
 				st = stateKey
-				fmt.Println("{")
 
 			case '[': // array start
 				p.consume()
-				p.push(nestArr)
+				last := p.nestStack.peek()
+				if last != nil {
+					last.addValue(p.pushArray())
+				} else {
+					p.pushObject()
+				}
+
 				st = stateValue
-				fmt.Print("[")
 
 			case 'n': //null
 				if err = p.musts("null"); err != nil {
-					return err
+					return nil, err
 				}
+
+				p.nestStack.peek().addValue(newNull())
 				st = stateValueEnd
-				fmt.Print("null")
 
 			case 'f': //false
 				if err = p.musts("false"); err != nil {
-					return err
+					return nil, err
 				}
+				p.nestStack.peek().addValue(newBool(false))
 				st = stateValueEnd
-				fmt.Print("false")
 
 			case 't':
 				if err = p.musts("true"); err != nil {
-					return err
+					return nil, err
 				}
+				p.nestStack.peek().addValue(newBool(true))
 				st = stateValueEnd
-				fmt.Print("true")
 
 			case '"':
 				str, err := p.parseString()
 				if err != nil {
-					return err
+					return nil, err
 				}
+				p.nestStack.peek().addValue(newString(str))
 				st = stateValueEnd
-				fmt.Printf("%q", str)
 
 			default:
 				if isNum(c) || c == '-' { // number
 					num, err := p.parseNumber()
 					if err != nil {
-						return err
+						return nil, err
+					}
+					switch v := num.(type) {
+					case int:
+						p.nestStack.peek().addValue(newInt(v))
+					case float64:
+						p.nestStack.peek().addValue(newFloat(v))
+					default:
+						panic("number")
 					}
 					st = stateValueEnd
-					fmt.Print(num)
 				} else {
-					return p.unexpectError("unexpected value")
+					return nil, p.unexpectError("unexpected value")
 				}
 			}
 		case stateValueEnd:
 			// after value ',' or '}' or ']'
-			last := p.nestStack.peek()
-			isArr := last == nestArr
-			isObj := last == nestObj
+			isArr := p.isArr()
+			isObj := p.isObj()
 			if c == '}' {
 				p.consume()
-				if p.pop() != nestObj {
+				var ok bool
+				if value, ok = p.pop().(*ObjectValue); !ok {
 					panic("closing } but stack last is not nestObj")
 				}
 
 				st = stateValueEnd
-				fmt.Print("}")
 				if p.len() == 0 {
 					break loop
 				}
 			} else if c == ']' {
 				p.consume()
-				if p.pop() != nestArr {
+				if _, ok := p.pop().(*ArrayValue); !ok {
 					panic("closing ] but stack last is not nestArr")
 				}
 				st = stateValueEnd
-				fmt.Print("]")
 				if p.len() == 0 {
 					break loop
 				}
@@ -135,17 +150,15 @@ loop:
 				p.consume()
 				if isArr {
 					st = stateValue
-					fmt.Print(",")
 				} else if isObj {
 					st = stateKey
-					fmt.Println(",")
 				} else {
-					return p.unexpectError("unexpected error")
+					return nil, p.unexpectError("unexpected error")
 				}
 			} else {
-				return p.unexpectError("unexpected error")
+				return nil, p.unexpectError("unexpected error")
 			}
 		}
 	}
-	return nil
+	return value, nil
 }
