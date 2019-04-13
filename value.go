@@ -1,5 +1,7 @@
 package json
 
+import "fmt"
+
 type (
 	Value interface {
 		Value() interface{}
@@ -33,11 +35,11 @@ type (
 	NullValue struct{}
 
 	ObjectValue struct {
-		keyValues []*KeyValue
+		KeyValues []*KeyValue
 	}
 
 	ArrayValue struct {
-		inner []Value
+		Values []Value
 	}
 )
 
@@ -51,6 +53,14 @@ func (b *BoolValue) Value() interface{} {
 	return b.inner
 }
 
+func (b *BoolValue) String() string {
+	if b.inner {
+		return "true"
+	} else {
+		return "false"
+	}
+}
+
 func newInt(i int) *IntValue {
 	return &IntValue{
 		inner: i,
@@ -59,6 +69,10 @@ func newInt(i int) *IntValue {
 
 func (i *IntValue) Value() interface{} {
 	return i.inner
+}
+
+func (i *IntValue) String() string {
+	return string(i.inner)
 }
 
 func newFloat(f float64) *FloatValue {
@@ -71,6 +85,10 @@ func (f *FloatValue) Value() interface{} {
 	return f.inner
 }
 
+func (f *FloatValue) String() string {
+	return fmt.Sprint(f.inner)
+}
+
 func newString(s string) *StringValue {
 	return &StringValue{
 		inner: s,
@@ -81,12 +99,20 @@ func (s *StringValue) Value() interface{} {
 	return s.inner
 }
 
+func (s *StringValue) String() string {
+	return fmt.Sprintf("%q", s.inner)
+}
+
 func newNull() *NullValue {
 	return &NullValue{}
 }
 
 func (n *NullValue) Value() interface{} {
 	return nil
+}
+
+func (n *NullValue) String() string {
+	return "null"
 }
 
 func newObject() *ObjectValue {
@@ -102,13 +128,13 @@ func (o *ObjectValue) addValue(v Value) {
 }
 
 func (o *ObjectValue) AddKey(k string) {
-	o.keyValues = append(o.keyValues, &KeyValue{
+	o.KeyValues = append(o.KeyValues, &KeyValue{
 		Key: k,
 	})
 }
 
 func (o *ObjectValue) SetValue(v Value) {
-	o.keyValues[len(o.keyValues)-1].Value = v
+	o.KeyValues[len(o.KeyValues)-1].Value = v
 }
 
 func newArray() *ArrayValue {
@@ -120,7 +146,7 @@ func (a *ArrayValue) Value() interface{} {
 }
 
 func (a *ArrayValue) push(v Value) {
-	a.inner = append(a.inner, v)
+	a.Values = append(a.Values, v)
 }
 
 func (a *ArrayValue) addValue(v Value) {

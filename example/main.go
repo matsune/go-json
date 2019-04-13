@@ -21,12 +21,49 @@ func main() {
 		os.Exit(1)
 	}
 
-	if v, err := json.Parse(string(b)); err != nil {
+	v, err := json.Parse(string(b))
+	if err != nil {
 		panic(err)
-	} else {
-		if vv, ok := v.(json.Value); ok {
-			fmt.Println(vv)
-		}
 	}
+	walk(v.(json.Value), 0)
+}
 
+func walk(v json.Value, nest int) {
+	switch vv := v.(type) {
+	case *json.ObjectValue:
+		fmt.Println("{")
+		nest++
+		for i, kv := range vv.KeyValues {
+			indent(nest)
+			fmt.Printf("%q: ", kv.Key)
+			walk(kv.Value, nest)
+			if i < len(vv.KeyValues)-1 {
+				fmt.Println(",")
+			} else {
+				fmt.Println()
+			}
+		}
+		nest--
+		indent(nest)
+		fmt.Print("}")
+	case *json.ArrayValue:
+		fmt.Printf("[")
+		nest++
+		for i, vvv := range vv.Values {
+			walk(vvv, nest)
+			if i < len(vv.Values)-1 {
+				fmt.Print(",")
+			}
+		}
+		nest--
+		fmt.Print("]")
+	default:
+		fmt.Print(vv)
+	}
+}
+
+func indent(nest int) {
+	for i := 0; i < nest; i++ {
+		fmt.Print("  ")
+	}
 }
