@@ -46,6 +46,8 @@ func (s *scanner) consume() (rune, error) {
 	if isNL(c) {
 		s.line++
 		s.col = 1
+	} else {
+		s.col++
 	}
 	s.offset++
 	return c, nil
@@ -64,6 +66,8 @@ func (s *scanner) skipSpaces() (rune, error) {
 			s.col = 1
 		} else if !isSpace(c) {
 			break
+		} else {
+			s.col++
 		}
 		s.offset++
 	}

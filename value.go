@@ -21,7 +21,7 @@ type (
 	}
 
 	IntValue struct {
-		inner int
+		inner int64
 	}
 
 	FloatValue struct {
@@ -61,7 +61,7 @@ func (b *BoolValue) String() string {
 	}
 }
 
-func newInt(i int) *IntValue {
+func newInt(i int64) *IntValue {
 	return &IntValue{
 		inner: i,
 	}

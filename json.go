@@ -110,12 +110,12 @@ loop:
 						return nil, err
 					}
 					switch v := num.(type) {
-					case int:
+					case int64:
 						p.nestStack.peek().addValue(newInt(v))
 					case float64:
 						p.nestStack.peek().addValue(newFloat(v))
 					default:
-						panic("number")
+						return nil, p.unexpectError("unknown value ")
 					}
 					st = stateValueEnd
 				} else {
