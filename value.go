@@ -72,7 +72,7 @@ func (i *IntValue) Value() interface{} {
 }
 
 func (i *IntValue) String() string {
-	return string(i.inner)
+	return fmt.Sprint(i.inner)
 }
 
 func newFloat(f float64) *FloatValue {
