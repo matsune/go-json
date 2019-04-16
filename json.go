@@ -68,7 +68,7 @@ loop:
 				if last != nil {
 					last.addValue(p.pushArray())
 				} else {
-					p.pushObject()
+					p.pushArray()
 				}
 
 				st = stateValue
@@ -139,9 +139,11 @@ loop:
 				}
 			} else if c == ']' {
 				p.consume()
-				if _, ok := p.pop().(*ArrayValue); !ok {
+				var ok bool
+				if value, ok = p.pop().(*ArrayValue); !ok {
 					panic("closing ] but stack last is not nestArr")
 				}
+
 				st = stateValueEnd
 				if p.len() == 0 {
 					break loop
