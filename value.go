@@ -1,6 +1,8 @@
 package json
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type (
 	Value interface {

@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/matsune/go-json"
+	json "github.com/matsune/go-json"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
@@ -31,7 +31,10 @@ func main() {
 func walk(v json.Value, nest int) {
 	switch vv := v.(type) {
 	case *json.ObjectValue:
-		fmt.Println("{")
+		fmt.Print("{")
+		if len(vv.KeyValues) > 0 {
+			fmt.Println()
+		}
 		nest++
 		for i, kv := range vv.KeyValues {
 			indent(nest)
@@ -44,7 +47,9 @@ func walk(v json.Value, nest int) {
 			}
 		}
 		nest--
-		indent(nest)
+		if len(vv.KeyValues) > 0 {
+			indent(nest)
+		}
 		fmt.Print("}")
 	case *json.ArrayValue:
 		fmt.Printf("[")

@@ -60,7 +60,15 @@ loop:
 					p.pushObject()
 				}
 
-				st = stateKey
+				next, err := p.get()
+				if err != nil {
+					return nil, err
+				}
+				if next == '}' {
+					st = stateValueEnd
+				} else {
+					st = stateKey
+				}
 
 			case '[': // array start
 				p.consume()
@@ -71,7 +79,15 @@ loop:
 					p.pushArray()
 				}
 
-				st = stateValue
+				next, err := p.get()
+				if err != nil {
+					return nil, err
+				}
+				if next == ']' {
+					st = stateValueEnd
+				} else {
+					st = stateValue
+				}
 
 			case 'n': //null
 				if err = p.musts("null"); err != nil {
