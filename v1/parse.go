@@ -1,3 +1,5 @@
 package json
 
-func Parse() {}
+func Parse(str string) (Value, error) {
+	return nil, nil
+}
