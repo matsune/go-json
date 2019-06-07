@@ -1,9 +1,19 @@
 package json
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 )
+
+func Parse(str string) (Value, error) {
+	p := NewParser(str)
+	p.skipSpaces()
+	if p.get() == EOF {
+		return nil, errors.New("json is empty")
+	}
+	return p.parseJson()
+}
 
 type Parser struct {
 	*Scanner
@@ -24,12 +34,12 @@ func (p *Parser) error(msg string) *ParseError {
 	}
 }
 
-func (p *Parser) unexpectedEOF() *ParseError {
-	return p.error("Unexpected EOF")
-}
-
 func (p *Parser) unexpected(r rune) *ParseError {
-	return p.error(fmt.Sprintf("Unexpected char %c", r))
+	if r == 0 {
+		return p.error("Unexpected EOF")
+	} else {
+		return p.error(fmt.Sprintf("Unexpected char %c", r))
+	}
 }
 
 func (p *Parser) must(c rune) error {
@@ -43,15 +53,183 @@ func (p *Parser) must(c rune) error {
 	return nil
 }
 
-// 4hex := {Hex}{Hex}{Hex}{Hex}
+func (p *Parser) musts(str string) error {
+	for _, r := range []rune(str) {
+		c := p.consume()
+		if c != r {
+			return p.error(fmt.Sprintf("Expected %s", str))
+		}
+	}
+	return nil
+}
+
+// Json := <Object> | <Array>
+func (p *Parser) parseJson() (Value, error) {
+	c := p.get()
+	switch c {
+	case '{':
+		return p.parseObject()
+	case '[':
+		return p.parseArray()
+	default:
+		return nil, p.unexpected(c)
+	}
+}
+
+// Object := '{' <s>* '}' | '{' <s>* <Members> <s>* '}'
+// Members := <Pair> | <Pair> <s>* ',' <s>* <Members>
+func (p *Parser) parseObject() (*Object, error) {
+	err := p.must('{')
+	if err != nil {
+		return nil, err
+	}
+	obj := p.pushObject()
+
+	p.skipSpaces()
+
+	// key string or }
+	c := p.get()
+	if c == '"' {
+		for {
+			// parse pairs and add to this obj
+			pair, err := p.parsePair()
+			if err != nil {
+				return nil, err
+			}
+			obj.AddValue(pair)
+			p.skipSpaces()
+
+			c = p.get()
+			if c == ',' {
+				p.consume()
+				p.skipSpaces()
+			} else {
+				break
+			}
+		}
+	}
+
+	if c == '}' {
+		p.consume()
+		p.pop()
+	}
+	return obj, nil
+}
+
+// Pair := <String> <s>* ':' <s>* <Value>
+func (p *Parser) parsePair() (*Pair, error) {
+	s, err := p.parseString()
+	if err != nil {
+		return nil, err
+	}
+	p.skipSpaces()
+	if err = p.must(':'); err != nil {
+		return nil, err
+	}
+	p.skipSpaces()
+	v, err := p.parseValue()
+	if err != nil {
+		return nil, err
+	}
+	return NewPair(s.inner, v), nil
+}
+
+// Value := <String> | <Number> | <Object> | <Array> | <Bool> | null
+func (p *Parser) parseValue() (Value, error) {
+	c := p.get()
+	if c == '"' {
+		return p.parseString()
+	} else if c == '-' || isDigit(c) {
+		return p.parseNumber()
+	} else if c == '{' {
+		return p.parseObject()
+	} else if c == '[' {
+		return p.parseArray()
+	} else if c == 't' || c == 'f' {
+		return p.parseBool()
+	} else if c == 'n' {
+		return p.parseNull()
+	} else {
+		return nil, p.unexpected(c)
+	}
+}
+
+// Array := '[' <s>* ']' | '[' <s>* <Elements> <s>* ']'
+// Elements := <Value> | <Value> <s>* ',' <s>* <Elements>
+func (p *Parser) parseArray() (*Array, error) {
+	err := p.must('[')
+	if err != nil {
+		return nil, err
+	}
+	arr := p.pushArray()
+
+	p.skipSpaces()
+
+	// Elements or ]
+	c := p.get()
+	if c == ']' {
+		p.consume()
+		// ']'
+		p.pop()
+		return arr, nil
+	}
+	// Elements
+	for {
+		// parse Value and add to this arr
+		v, err := p.parseValue()
+		if err != nil {
+			return nil, err
+		}
+		arr.AddValue(v)
+		p.skipSpaces()
+
+		c = p.get()
+		if c == ',' {
+			p.consume()
+			p.skipSpaces()
+		} else {
+			break
+		}
+	}
+	if err = p.must(']'); err != nil {
+		return nil, err
+	}
+
+	return arr, nil
+}
+
+// Bool := true | false
+func (p *Parser) parseBool() (*Bool, error) {
+	c := p.get()
+	if c == 't' {
+		if err := p.musts("true"); err != nil {
+			return nil, err
+		}
+		return NewBool(true), nil
+	} else if c == 'f' {
+		if err := p.musts("false"); err != nil {
+			return nil, err
+		}
+		return NewBool(false), nil
+	} else {
+		return nil, p.unexpected(c)
+	}
+}
+
+// Null := null
+func (p *Parser) parseNull() (*Null, error) {
+	if err := p.musts("null"); err != nil {
+		return nil, err
+	}
+	return NewNull(), nil
+}
+
+// 4hex := <Hex>{4}
 func (p *Parser) parse4hex() (rune, error) {
 	hexStr := make([]rune, 4)
 	for i := 0; i < 4; i++ {
 		r := p.consume()
-		if r == EOF {
-			return 0, p.unexpectedEOF()
-		}
-		if !isHex(r) {
+		if r == EOF || !isHex(r) {
 			return 0, p.unexpected(r)
 		}
 		hexStr[i] = r
@@ -63,7 +241,7 @@ func (p *Parser) parse4hex() (rune, error) {
 	return rune(h), nil
 }
 
-// String := '"' ({Unescaped}|'\'(["\/bfnrt]|'u'{4hex}))* '"'
+// String := '"' ({Unescaped}|'\'(["\/bfnrt]|'u'<4hex>))* '"'
 func (p *Parser) parseString() (*String, error) {
 	var err error
 	if err = p.must('"'); err != nil {
@@ -74,7 +252,7 @@ func (p *Parser) parseString() (*String, error) {
 	for {
 		r := p.consume()
 		if r == EOF {
-			return nil, p.unexpectedEOF()
+			return nil, p.unexpected(r)
 		}
 		if r == '"' && !isEscaping {
 			break
@@ -118,11 +296,11 @@ func (p *Parser) parseString() (*String, error) {
 	return NewString(string(runes)), nil
 }
 
-// Number := '-'?('0'|{Digit9}{Digit}*)('.'{Digit}+)?([Ee][+-]?{Digit}+)?
+// Number := '-'?('0'|<Digit9><Digit>*)('.'<Digit>+)?([Ee][+-]?<Digit>+)?
 func (p *Parser) parseNumber() (Value, error) {
-	c := p.consume()
+	c := p.get()
 	if c == EOF {
-		return nil, p.unexpectedEOF()
+		return nil, p.unexpected(c)
 	}
 	r := []rune{}
 
@@ -130,25 +308,23 @@ func (p *Parser) parseNumber() (Value, error) {
 	// '-'?
 	if c == '-' {
 		r = append(r, c)
-
-		c = p.consume()
-		if c == EOF {
-			return nil, p.unexpectedEOF()
-		}
+		c = p.next()
 	}
-	// 0|[1-9]{digit}*
+	// 0|[1-9]<digit>*
 	if c == '0' {
 		r = append(r, c)
-		c = p.consume()
+		c = p.next()
 		if c == EOF {
 			return NewInt(0), nil
 		}
 	} else if isDigit9(c) {
 		r = append(r, c)
+		c = p.next()
+
 		for {
-			c = p.consume()
 			if isDigit(c) {
 				r = append(r, c)
+				c = p.next()
 			} else {
 				break
 			}
@@ -160,18 +336,18 @@ func (p *Parser) parseNumber() (Value, error) {
 	if c == '.' {
 		isFloat = true
 		r = append(r, c)
-		// '.'{digit}+
-		c = p.consume()
+		// '.'<digit>+
+		c = p.next()
 		if c == EOF {
-			return nil, p.unexpectedEOF()
+			return nil, p.unexpected(c)
 		}
-		// {digit}+
+		// <digit>+
 		if !isDigit(c) {
 			return nil, p.unexpected(c)
 		}
 		for {
 			r = append(r, c)
-			c = p.consume()
+			c = p.next()
 			if !isDigit(c) {
 				break
 			}
@@ -180,25 +356,25 @@ func (p *Parser) parseNumber() (Value, error) {
 	if c == 'e' || c == 'E' {
 		isFloat = true
 		r = append(r, c)
-		// [eE][+-]?{digit}+
-		c = p.consume()
+		// [eE][+-]?<digit>+
+		c = p.next()
 		if c == EOF {
-			return nil, p.unexpectedEOF()
+			return nil, p.unexpected(c)
 		}
 		if isSign(c) {
 			r = append(r, c)
-			c = p.consume()
+			c = p.next()
 			if c == EOF {
-				return nil, p.unexpectedEOF()
+				return nil, p.unexpected(c)
 			}
 		}
-		// {digit}+
+		// <digit>+
 		if !isDigit(c) {
 			return nil, p.unexpected(c)
 		}
 		for {
 			r = append(r, c)
-			c = p.consume()
+			c = p.next()
 			if !isDigit(c) {
 				break
 			}

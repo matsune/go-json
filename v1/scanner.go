@@ -28,16 +28,23 @@ func (s *Scanner) get() rune {
 	return s.str[s.offset]
 }
 
-// read next rune without step forward
-func (s *Scanner) peek() rune {
-	hasNext := (s.offset + 1) < len(s.str)
-	if !hasNext {
+// step forward and then get rune
+func (s *Scanner) next() rune {
+	if s.isEOF() {
 		return EOF
 	}
-	return s.str[s.offset+1]
+	c := s.str[s.offset]
+	if isNL(c) {
+		s.line++
+		s.col = 1
+	} else {
+		s.col++
+	}
+	s.offset++
+	return s.get()
 }
 
-// get current rune and step forward if it was not EOF
+// get current rune and then step forward
 func (s *Scanner) consume() rune {
 	if s.isEOF() {
 		return EOF

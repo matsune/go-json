@@ -116,6 +116,9 @@ func TestParser_parseString(t *testing.T) {
 			if got != nil && got.inner != tt.want {
 				t.Errorf("Parser.parseString() = %v, want %v", got.inner, tt.want)
 			}
+			if p.get() != EOF {
+				t.Errorf("parser didn't reach to EOF")
+			}
 		})
 	}
 }
@@ -144,7 +147,7 @@ func TestParser_parse4hex(t *testing.T) {
 				t.Errorf("Parser.parse4hex() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if got != tt.want {
+			if !tt.wantErr && got != tt.want {
 				t.Errorf("Parser.parse4hex() = %v, want %v", got, tt.want)
 			}
 		})
@@ -167,16 +170,6 @@ func TestParser_parseNumber(t *testing.T) {
 			name: "sint",
 			str:  "-789",
 			want: NewInt(-789),
-		},
-		{
-			name: "invalid uint",
-			str:  "0123",
-			want: NewInt(0),
-		},
-		{
-			name: "invalid sint",
-			str:  "-0123",
-			want: NewInt(0),
 		},
 		{
 			name: "ufloat",
@@ -229,6 +222,187 @@ func TestParser_parseNumber(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Parser.parseNumber() = %v, want %v", got, tt.want)
+			}
+			if !tt.wantErr && p.get() != EOF {
+				t.Errorf("parser didn't reach to EOF")
+			}
+		})
+	}
+}
+
+func TestParser_parseBool(t *testing.T) {
+	tests := []struct {
+		name    string
+		str     string
+		want    *Bool
+		wantErr bool
+	}{
+		{
+			str:  "true",
+			want: NewBool(true),
+		},
+		{
+			str:  "false",
+			want: NewBool(false),
+		},
+		{
+			str:     "",
+			wantErr: true,
+		},
+		{
+			str:     "TRUE",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := NewParser(tt.str)
+			got, err := p.parseBool()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Parser.parseBool() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Parser.parseBool() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParser_parseNull(t *testing.T) {
+	tests := []struct {
+		name    string
+		str     string
+		want    *Null
+		wantErr bool
+	}{
+		{
+			str:  "null",
+			want: NewNull(),
+		},
+		{
+			str:     "nil",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := NewParser(tt.str)
+			got, err := p.parseNull()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Parser.parseNull() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Parser.parseNull() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParser_parseObject(t *testing.T) {
+	tests := []struct {
+		name    string
+		str     string
+		want    *Object
+		wantErr bool
+	}{
+		{
+			str: `{
+			"str": "bbb",
+			"int": 10,
+			"float": 0.33,
+			"t": true,
+			"f": false,
+			"arr": [
+				0, 1, 2
+			],
+			"nest": {
+				"a": "b"
+			},
+			"null": null
+		}`,
+			want: &Object{
+				inner: []*Pair{
+					NewPair("str", NewString("bbb")),
+					NewPair("int", NewInt(10)),
+					NewPair("float", NewFloat(0.33)),
+					NewPair("t", NewBool(true)),
+					NewPair("f", NewBool(false)),
+					NewPair("arr", &Array{
+						inner: []Value{
+							NewInt(0),
+							NewInt(1),
+							NewInt(2),
+						},
+					}),
+					NewPair("nest", &Object{
+						inner: []*Pair{
+							NewPair("a", NewString("b")),
+						},
+					}),
+					NewPair("null", NewNull()),
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := NewParser(tt.str)
+			got, err := p.parseObject()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Parser.parseObject() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Parser.parseObject() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParser_parsePair(t *testing.T) {
+	tests := []struct {
+		name    string
+		str     string
+		want    *Pair
+		wantErr bool
+	}{
+		{
+			str:  `"key": "str"`,
+			want: NewPair("key", NewString("str")),
+		},
+		{
+			str:  `"key": 210`,
+			want: NewPair("key", NewInt(210)),
+		},
+		{
+			str:  `"key": 0.21`,
+			want: NewPair("key", NewFloat(0.21)),
+		},
+		{
+			str:  `"key": true`,
+			want: NewPair("key", NewBool(true)),
+		},
+		{
+			str:  `"key": false`,
+			want: NewPair("key", NewBool(false)),
+		},
+		{
+			str:  `"key": null`,
+			want: NewPair("key", NewNull()),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := NewParser(tt.str)
+			got, err := p.parsePair()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Parser.parsePair() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Parser.parsePair() = %v, want %v", got, tt.want)
 			}
 		})
 	}

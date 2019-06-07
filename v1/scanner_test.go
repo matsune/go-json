@@ -112,53 +112,6 @@ func TestScanner_get(t *testing.T) {
 	}
 }
 
-func TestScanner_peek(t *testing.T) {
-	type fields struct {
-		Pos    *Pos
-		offset int
-		str    []rune
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   rune
-	}{
-		{
-			fields: fields{
-				offset: 0,
-				str:    []rune("abc"),
-			},
-			want: 'b',
-		},
-		{
-			fields: fields{
-				offset: 1,
-				str:    []rune("abc"),
-			},
-			want: 'c',
-		},
-		{
-			fields: fields{
-				offset: 2,
-				str:    []rune("abc"),
-			},
-			want: EOF,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Scanner{
-				Pos:    tt.fields.Pos,
-				offset: tt.fields.offset,
-				str:    tt.fields.str,
-			}
-			if got := s.peek(); got != tt.want {
-				t.Errorf("Scanner.peek() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestScanner_consume(t *testing.T) {
 	s := NewScanner("abc")
 	type fields struct {

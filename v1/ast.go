@@ -12,7 +12,7 @@ type (
 
 	// Object and Array
 	NestValue interface {
-		AddValue(v Value)
+		NestValue()
 	}
 
 	Object struct {
@@ -57,18 +57,15 @@ func (o *Object) Value() interface{} {
 	return o
 }
 
-func (o *Object) AddValue(v Value) {
-	o.SetValue(v)
+func (o *Object) AddValue(pair *Pair) {
+	o.inner = append(o.inner, pair)
 }
 
-func (o *Object) AddKey(k string) {
-	o.inner = append(o.inner, &Pair{
-		Key: k,
-	})
-}
-
-func (o *Object) SetValue(v Value) {
-	o.inner[len(o.inner)-1].Value = v
+func NewPair(k string, v Value) *Pair {
+	return &Pair{
+		Key:   k,
+		Value: v,
+	}
 }
 
 func NewArray() *Array {
@@ -82,6 +79,9 @@ func (a *Array) Value() interface{} {
 func (a *Array) AddValue(v Value) {
 	a.inner = append(a.inner, v)
 }
+
+func (Object) NestValue() {}
+func (Array) NestValue()  {}
 
 func NewBool(b bool) *Bool {
 	return &Bool{
