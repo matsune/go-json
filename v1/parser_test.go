@@ -1,6 +1,7 @@
 package json
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -145,6 +146,89 @@ func TestParser_parse4hex(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("Parser.parse4hex() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParser_parseNumber(t *testing.T) {
+	tests := []struct {
+		name    string
+		str     string
+		want    Value
+		wantErr bool
+	}{
+		{
+			name: "uint",
+			str:  "123",
+			want: NewInt(123),
+		},
+		{
+			name: "sint",
+			str:  "-789",
+			want: NewInt(-789),
+		},
+		{
+			name: "invalid uint",
+			str:  "0123",
+			want: NewInt(0),
+		},
+		{
+			name: "invalid sint",
+			str:  "-0123",
+			want: NewInt(0),
+		},
+		{
+			name: "ufloat",
+			str:  "0.123",
+			want: NewFloat(0.123),
+		},
+		{
+			name: "sfloat",
+			str:  "-10.123",
+			want: NewFloat(-10.123),
+		},
+		{
+			name:    "invalid float",
+			str:     ".123",
+			wantErr: true,
+		},
+		{
+			name: "floating point expression",
+			str:  "1.8033161362862765e-20",
+			want: NewFloat(1.8033161362862765e-20),
+		},
+		{
+			name: "floating point expression",
+			str:  "-1.8033161362862765E+13",
+			want: NewFloat(-1.8033161362862765e+13),
+		},
+		{
+			name: "floating point expression",
+			str:  "5E13",
+			want: NewFloat(5e+13),
+		},
+		{
+			name: "floating point expression",
+			str:  "5E-1",
+			want: NewFloat(5e-1),
+		},
+		{
+			name:    "invalid floating point expression",
+			str:     "0.E+13",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := NewParser(tt.str)
+			got, err := p.parseNumber()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Parser.parseNumber() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Parser.parseNumber() = %v, want %v", got, tt.want)
 			}
 		})
 	}

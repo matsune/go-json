@@ -43,7 +43,7 @@ func (p *Parser) must(c rune) error {
 	return nil
 }
 
-// isHex{4}
+// 4hex := {Hex}{Hex}{Hex}{Hex}
 func (p *Parser) parse4hex() (rune, error) {
 	hexStr := make([]rune, 4)
 	for i := 0; i < 4; i++ {
@@ -63,6 +63,7 @@ func (p *Parser) parse4hex() (rune, error) {
 	return rune(h), nil
 }
 
+// String := '"' ({Unescaped}|'\'(["\/bfnrt]|'u'{4hex}))* '"'
 func (p *Parser) parseString() (*String, error) {
 	var err error
 	if err = p.must('"'); err != nil {
@@ -115,4 +116,106 @@ func (p *Parser) parseString() (*String, error) {
 		}
 	}
 	return NewString(string(runes)), nil
+}
+
+// Number := '-'?('0'|{Digit9}{Digit}*)('.'{Digit}+)?([Ee][+-]?{Digit}+)?
+func (p *Parser) parseNumber() (Value, error) {
+	c := p.consume()
+	if c == EOF {
+		return nil, p.unexpectedEOF()
+	}
+	r := []rune{}
+
+	isFloat := false
+	// '-'?
+	if c == '-' {
+		r = append(r, c)
+
+		c = p.consume()
+		if c == EOF {
+			return nil, p.unexpectedEOF()
+		}
+	}
+	// 0|[1-9]{digit}*
+	if c == '0' {
+		r = append(r, c)
+		c = p.consume()
+		if c == EOF {
+			return NewInt(0), nil
+		}
+	} else if isDigit9(c) {
+		r = append(r, c)
+		for {
+			c = p.consume()
+			if isDigit(c) {
+				r = append(r, c)
+			} else {
+				break
+			}
+		}
+	} else {
+		return nil, p.unexpected(c)
+	}
+
+	if c == '.' {
+		isFloat = true
+		r = append(r, c)
+		// '.'{digit}+
+		c = p.consume()
+		if c == EOF {
+			return nil, p.unexpectedEOF()
+		}
+		// {digit}+
+		if !isDigit(c) {
+			return nil, p.unexpected(c)
+		}
+		for {
+			r = append(r, c)
+			c = p.consume()
+			if !isDigit(c) {
+				break
+			}
+		}
+	}
+	if c == 'e' || c == 'E' {
+		isFloat = true
+		r = append(r, c)
+		// [eE][+-]?{digit}+
+		c = p.consume()
+		if c == EOF {
+			return nil, p.unexpectedEOF()
+		}
+		if isSign(c) {
+			r = append(r, c)
+			c = p.consume()
+			if c == EOF {
+				return nil, p.unexpectedEOF()
+			}
+		}
+		// {digit}+
+		if !isDigit(c) {
+			return nil, p.unexpected(c)
+		}
+		for {
+			r = append(r, c)
+			c = p.consume()
+			if !isDigit(c) {
+				break
+			}
+		}
+	}
+
+	if isFloat {
+		f, err := strconv.ParseFloat(string(r), 64)
+		if err != nil {
+			return nil, p.error(err.Error())
+		}
+		return NewFloat(f), nil
+	} else {
+		n, err := strconv.ParseInt(string(r), 10, 64)
+		if err != nil {
+			return nil, p.error(err.Error())
+		}
+		return NewInt(n), nil
+	}
 }
