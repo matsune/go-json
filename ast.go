@@ -16,7 +16,7 @@ type (
 	}
 
 	Object struct {
-		inner []*Pair
+		Pairs []*Pair
 	}
 
 	Pair struct {
@@ -25,7 +25,7 @@ type (
 	}
 
 	Array struct {
-		inner []Value
+		Values []Value
 	}
 
 	// Values
@@ -58,7 +58,7 @@ func (o *Object) Value() interface{} {
 }
 
 func (o *Object) AddValue(pair *Pair) {
-	o.inner = append(o.inner, pair)
+	o.Pairs = append(o.Pairs, pair)
 }
 
 func NewPair(k string, v Value) *Pair {
@@ -77,7 +77,7 @@ func (a *Array) Value() interface{} {
 }
 
 func (a *Array) AddValue(v Value) {
-	a.inner = append(a.inner, v)
+	a.Values = append(a.Values, v)
 }
 
 func (Object) NestValue() {}

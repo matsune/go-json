@@ -323,21 +323,21 @@ func TestParser_parseObject(t *testing.T) {
 			"null": null
 		}`,
 			want: &Object{
-				inner: []*Pair{
+				Pairs: []*Pair{
 					NewPair("str", NewString("bbb")),
 					NewPair("int", NewInt(10)),
 					NewPair("float", NewFloat(0.33)),
 					NewPair("t", NewBool(true)),
 					NewPair("f", NewBool(false)),
 					NewPair("arr", &Array{
-						inner: []Value{
+						Values: []Value{
 							NewInt(0),
 							NewInt(1),
 							NewInt(2),
 						},
 					}),
 					NewPair("nest", &Object{
-						inner: []*Pair{
+						Pairs: []*Pair{
 							NewPair("a", NewString("b")),
 						},
 					}),
